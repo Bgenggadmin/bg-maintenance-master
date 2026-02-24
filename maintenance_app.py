@@ -11,7 +11,7 @@ IST = pytz.timezone('Asia/Kolkata')
 MAINT_LOG = "maintenance_records.csv"
 PHOTO_DIR = "maintenance_photos"
 
-# Headers for Maintenance Tracking
+# Headers exactly as shown in your Recent Logs
 HEADERS = ["Timestamp", "Technician", "Machine_ID", "Type", "Issue_Status", "Action_Taken", "Photo_Path"]
 
 # --- 2. GITHUB SYNC ---
@@ -21,12 +21,9 @@ def sync_to_github(file_path, is_image=False):
             g = Github(st.secrets["GITHUB_TOKEN"])
             repo = g.get_repo(st.secrets["GITHUB_REPO"])
             
-            if is_image:
-                with open(file_path, "rb") as f:
-                    content = f.read()
-            else:
-                with open(file_path, "r") as f:
-                    content = f.read()
+            mode = "rb" if is_image else "r"
+            with open(file_path, mode) as f:
+                content = f.read()
             
             try:
                 contents = repo.get_contents(file_path)
@@ -39,16 +36,16 @@ def sync_to_github(file_path, is_image=False):
 st.set_page_config(page_title="B&G Maintenance Master", layout="wide")
 st.title("⚙️ B&G Machine Maintenance & PM")
 
-# --- 3. MAINTENANCE ENTRY FORM ---
+# --- 3. ENTRY FORM ---
 col1, col2 = st.columns(2)
 with col1:
-    tech_name = st.selectbox("Technician/Supervisor", ["Ravindra", "Prasanth", "Naresh"])
-    machine_id = st.selectbox("Machine ID", ["Plasma-01", "Welding-Machine-05", "Bending-Rolls", "Hydro-Pump-A", "Overhead-Crane"])
+    tech_name = st.selectbox("Technician/Supervisor", ["Naresh", "Ravindra", "Prasanth"])
+    machine_id = st.selectbox("Machine ID", ["Plasma-01", "Welding-Machine-05", "Bending-Rolls", "Overhead-Crane"])
     m_type = st.radio("Log Type", ["Breakdown (Unplanned)", "Preventive (PM)", "General Service"], horizontal=True)
-    status = st.selectbox("Current Machine Status", ["🟢 Running", "🟡 Under Observation", "🔴 Breakdown/Offline"])
+    status = st.selectbox("Current Status", ["🟢 Running", "🟡 Under Observation", "🔴 Breakdown/Offline"])
 
 with col2:
-    img_file = st.camera_input("📸 Take Photo of Issue/Part Replacement")
+    img_file = st.camera_input("📸 Take Photo of Issue/Part")
     action_taken = st.text_area("Observations / Action Taken")
 
 if st.button("⚙️ Submit Maintenance Record"):
@@ -66,37 +63,35 @@ if st.button("⚙️ Submit Maintenance Record"):
     if os.path.exists(MAINT_LOG):
         df = pd.read_csv(MAINT_LOG)
         df = df.loc[:, ~df.columns.duplicated()]
-        df = pd.concat([df, pd.DataFrame([new_row], columns=HEADERS)], ignore_index=True)
+        df = pd.concat([df[HEADERS], pd.DataFrame([new_row], columns=HEADERS)], ignore_index=True)
     else:
         df = pd.DataFrame([new_row], columns=HEADERS)
         
     df.to_csv(MAINT_LOG, index=False)
     sync_to_github(MAINT_LOG)
-    st.success(f"✅ Maintenance Record & Photo Synced at {ts}")
+    st.success(f"✅ Maintenance Record Synced at {ts}")
     st.rerun()
 
-# --- 4. DISPLAY & LOGS ---
+# --- 4. DISPLAY & GALLERY ---
 st.divider()
 if os.path.exists(MAINT_LOG):
     df_view = pd.read_csv(MAINT_LOG).reindex(columns=HEADERS)
     st.subheader("📊 Recent Maintenance Logs")
     st.dataframe(df_view.sort_values(by="Timestamp", ascending=False), use_container_width=True)
 
-    # --- 5. MAINTENANCE PHOTO GALLERY ---
     st.divider()
     st.subheader("🖼️ Maintenance Photo Gallery")
+    # Safety filter to prevent the gallery from showing "No photos captured yet" incorrectly
     photo_df = df_view[df_view['Photo_Path'].notna() & (df_view['Photo_Path'] != "None")]
     
     if not photo_df.empty:
-        gallery_list = (photo_df['Timestamp'] + " - " + photo_df['Machine_ID']).tolist()
-        selected_record = st.selectbox("Select Record to View Photo", gallery_list, key="maint_gallery")
+        gallery_options = (photo_df['Timestamp'] + " - " + photo_df['Machine_ID']).tolist()
+        selected_record = st.selectbox("Select Record to View Photo", gallery_options, key="m_gal")
         
         path_to_show = photo_df[(photo_df['Timestamp'] + " - " + photo_df['Machine_ID']) == selected_record]['Photo_Path'].values[0]
         
         if isinstance(path_to_show, str) and os.path.exists(path_to_show):
-            st.image(path_to_show, caption=f"Machine Detail: {selected_record}", use_container_width=True)
-        else:
-            st.info("💡 Photo is saved on GitHub. Refresh to sync locally.")
+            st.image(path_to_show, caption=f"Part Detail: {selected_record}", use_container_width=True)
     else:
         st.info("No photos captured yet.")
 else:
