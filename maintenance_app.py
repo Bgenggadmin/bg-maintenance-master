@@ -39,7 +39,7 @@ st.title("⚙️ B&G Machine Maintenance & PM")
 # --- 3. ENTRY FORM ---
 col1, col2 = st.columns(2)
 with col1:
-    tech_name = st.selectbox("Technician/Supervisor", ["Naresh", "Ravindra", "Prasanth"])
+    tech_name = st.selectbox("Technician/Supervisor", ["Brahmiah", "Ravindra", "Prasanth"])
     machine_id = st.selectbox("Machine ID", ["Plasma-01", "Welding-Machine-05", "Bending-Rolls", "Overhead-Crane"])
     m_type = st.radio("Log Type", ["Breakdown (Unplanned)", "Preventive (PM)", "General Service"], horizontal=True)
     status = st.selectbox("Current Status", ["🟢 Running", "🟡 Under Observation", "🔴 Breakdown/Offline"])
