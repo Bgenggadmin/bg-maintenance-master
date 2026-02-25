@@ -41,7 +41,7 @@ with st.form("maint_form", clear_on_submit=True):
     with col1:
         equipment = st.text_input("Equipment Name (e.g. CNC, EOT)").upper()
     technician = st.selectbox("Technician", ["Electrician", "Prasanth", "RamaSai", "Brahmiah"])
-        stage = st.selectbox("Type", ["Breakdown", "PM", "Spare Replace", "Lubrication", "Calibration"])
+    stage = st.selectbox("Type", ["Breakdown", "PM", "Spare Replace", "Lubrication", "Calibration"])
     with col2:
         ref_data = st.text_input("Ref (Machine ID / Part No)")
         status = st.radio("Equipment Status", ["🟢 Operational", "🔴 Down"])
