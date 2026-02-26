@@ -30,6 +30,8 @@ def save_to_github(dataframe):
         st.error(f"Sync Error: {e}")
         return False
 
+# Added cache decorator for instant data refresh
+@st.cache_data(ttl=1)
 def load_data():
     if os.path.exists(DB_FILE):
         try:
@@ -56,8 +58,13 @@ with st.form("maint_form", clear_on_submit=True):
         img_str = ""
         if cam_photo:
             img = Image.open(cam_photo)
+            
+            # OPTIMIZATION: Resize to Passport size (400px width)
+            img.thumbnail((400, 400))
+            
             buffered = BytesIO()
-            img.save(buffered, format="JPEG")
+            # OPTIMIZATION: Compress to ~60KB target
+            img.save(buffered, format="JPEG", quality=40, optimize=True)
             img_str = base64.b64encode(buffered.getvalue()).decode()
 
         new_row = pd.DataFrame([{
@@ -66,12 +73,16 @@ with st.form("maint_form", clear_on_submit=True):
             "Reference": ref_data, "Status": status, "Remarks": remarks, "Photo": img_str
         }])
 
-        df = load_data()
-        updated_df = pd.concat([df, new_row], ignore_index=True)
+        # Load fresh, concatenate and save
+        df_current = load_data()
+        updated_df = pd.concat([df_current, new_row], ignore_index=True)
         updated_df.to_csv(DB_FILE, index=False)
-        save_to_github(updated_df)
-        st.success("✅ Record Secured!")
-        st.rerun()
+        
+        if save_to_github(updated_df):
+            # Clear cache so the tabs update immediately
+            st.cache_data.clear()
+            st.success("✅ Record Secured!")
+            st.rerun()
 
 # --- 4. VIEW LOGS & PHOTOS ---
 st.divider()
@@ -90,11 +101,12 @@ if not df_view.empty:
         view_eq = st.selectbox("Select Machine to View Photos", ["All"] + list(df_view['Equipment'].unique()))
         gallery = df_view if view_eq == "All" else df_view[df_view['Equipment'] == view_eq]
         
-        for _, row in gallery.iterrows():
-            if isinstance(row['Photo'], str) and len(row['Photo']) > 10:
+        # Displaying newest photos first in gallery
+        for _, row in gallery.sort_values(by="Timestamp", ascending=False).iterrows():
+            if isinstance(row['Photo'], str) and len(row['Photo']) > 50:
                 with st.container():
                     st.write(f"**{row['Equipment']}** | {row['Stage']} | {row['Timestamp']}")
-                    # This line decodes the photo so it finally shows up
+                    # Decodes and displays at optimized passport width
                     st.image(base64.b64decode(row['Photo']), width=400)
                     st.divider()
 else:
